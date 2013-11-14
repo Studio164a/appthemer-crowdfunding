@@ -61,7 +61,7 @@ class ATCF_Campaign_Query extends WP_Query {
 function atcf_purchase_variable_pricing( $download_id ) {
 	$variable_pricing = edd_has_variable_prices( $download_id );
 
-	if ( ! $variable_pricing )
+	if ( ! $variable_pricing && ! get_post_meta( $download_id, 'campaign_norewards', true) )
 		return;
 
 	$prices = edd_get_variable_prices( $download_id );
