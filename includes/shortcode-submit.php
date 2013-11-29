@@ -13,17 +13,17 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 /**
  * Submission Process.
  *
- * If we are on the submission page, start things up. Register fieflds,
+ * If we are on the submission page, start things up. Register fields,
  * set up validation methods, etc.
  *
  * @since Astoundify Crowdfunding 1.7
  *
+ * @param array $args
  * @return mixed none|object
  */
-function atcf_submit_campaign() {
-	return ATCF_Submit_Campaign::instance();
+function atcf_submit_campaign($args = array()) {
+	return ATCF_Submit_Campaign::instance($args);
 }
-add_action( 'init', 'atcf_submit_campaign' );
 
 /**
  * Submission fields.
@@ -35,12 +35,8 @@ add_action( 'init', 'atcf_submit_campaign' );
  *
  * @return array $fields
  */
-function atcf_shortcode_submit_fields() {
-	$submit_campaign = atcf_submit_campaign();
-
-	$fields = $submit_campaign->register_fields();
-
-	return $fields;
+function atcf_shortcode_submit_fields($args = array()) {	
+	return atcf_submit_campaign($args)->get_registered_fields();
 }
 
 /**
@@ -66,11 +62,12 @@ class ATCF_Submit_Campaign {
 	 *
 	 * @since Astoundify Crowdfunding 1.7
 	 *
+	 * @param array $args
 	 * @return self
 	 */
-	public static function instance() {
+	public static function instance($args = array()) {
 		if ( ! isset ( self::$instance ) ) {
-			self::$instance = new self;
+			self::$instance = new self($args);
 		}
 
 		return self::$instance;
@@ -83,13 +80,11 @@ class ATCF_Submit_Campaign {
 	 *
 	 * @since Astoundify Crowdfunding 1.7
 	 *
+	 * @param array $args
 	 * @return void
 	 */
-	private function __construct() {
-		$this->register_fields();
-
-		/** Register the Shortcode */
-		add_shortcode( 'appthemer_crowdfunding_submit', 'atcf_shortcode_submit' );
+	private function __construct($args = array()) {
+		$this->registered_fields = $this->register_fields($args);		
 
 		/** Print errors above the shortcode */
 		add_action( 'atcf_shortcode_submit_before', 'edd_print_errors' );
@@ -133,9 +128,10 @@ class ATCF_Submit_Campaign {
 	 *
 	 * @see atcf_shortcode_sumbmit_fields()
 	 *
+	 * @param array $args
 	 * @return array $fields;
 	 */
-	public function register_fields() {
+	private function register_fields($args = array()) {
 		global $edd_options;
 
 		$min = isset ( $edd_options[ 'atcf_campaign_length_min' ] ) ? $edd_options[ 'atcf_campaign_length_min' ] : 14;
@@ -310,7 +306,7 @@ class ATCF_Submit_Campaign {
 			)
 		);
 
-		$fields = apply_filters( 'atcf_shortcode_submit_fields', $fields );
+		$fields = apply_filters( 'atcf_shortcode_submit_fields', $fields, $args );
 
 		uasort( $fields, __CLASS__ . '::sort_by_priority' );
 
@@ -322,6 +318,17 @@ class ATCF_Submit_Campaign {
 	        return 0;
 
 	    return ( $a[ 'priority' ] < $b[ 'priority' ] ) ? -1 : 1;
+	}
+
+	/**
+	 * Returns the registered fields. 
+	 * 
+	 * @since Astoundify Crowdfunding 1.7.4
+	 *
+	 * @return array
+	 */
+	public function get_registered_fields() {
+		return isset($this->registered_fields) ? $this->registered_fields : $this->register_fields();
 	}
 
 	/**
@@ -691,8 +698,8 @@ function atcf_shortcode_submit( $atts = array() ) {
 	global $edd_options;
 
 	$atts = shortcode_atts( array(
-		'campaign_id' => false,
-	), $atts );
+		'campaign_id' => false, 
+	), $atts, 'appthemer_crowdfunding_submit' );
 
 	$crowdfunding = crowdfunding();
 	$campaign     = $atts['campaign_id'] === false ? null : atcf_get_campaign( $atts[ 'campaign_id' ] );
@@ -713,11 +720,13 @@ function atcf_shortcode_submit( $atts = array() ) {
 		}
 	}
 
-	$args = array(
+	// Put together an $args array that contains the campaign object (or null), 
+	// whether we're in preview/edit mode and any arguments passed to the shortcode
+	$args = wp_parse_args( $atts, array(
 		'campaign'   => $campaign,
 		'previewing' => $is_draft,
 		'editing'    => $is_editing
-	);
+	) );
 
 	ob_start();
 
@@ -735,7 +744,7 @@ function atcf_shortcode_submit( $atts = array() ) {
 	<form action="" method="post" class="atcf-submit-campaign" enctype="multipart/form-data">
 
 		<?php
-			foreach ( atcf_shortcode_submit_fields() as $key => $field ) :
+			foreach ( atcf_shortcode_submit_fields($args) as $key => $field ) :
 				/** If we _aren't_ editing, and the field should only be shown on edit, skip... */
 				if ( ! $is_editing && 'only' === $field[ 'editable' ] )
 					continue;
@@ -782,6 +791,9 @@ function atcf_shortcode_submit( $atts = array() ) {
 
 	return $form;
 }
+
+/** Register the Shortcode */
+add_shortcode( 'appthemer_crowdfunding_submit', 'atcf_shortcode_submit' );
 
 /**
  * Terms of Service
@@ -1226,7 +1238,7 @@ function atcf_shortcode_submit_process() {
 
 	$action            = esc_attr( $_POST[ 'submit' ] );
 	$existing_campaign = isset ( $_POST[ 'campaign_id' ] ) ? esc_attr( $_POST[ 'campaign_id' ] ) : null;
-	$fields            = atcf_shortcode_submit_fields();
+	$fields            = atcf_shortcode_submit_fields(array('is_submission' => true));
 
 	$status = 'submit' == $action ? 'pending' : 'draft';
 
