@@ -18,12 +18,12 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  *
  * @since Astoundify Crowdfunding 1.7
  *
- * @param array $args
  * @return mixed none|object
  */
-function atcf_submit_campaign($args = array()) {
-	return ATCF_Submit_Campaign::instance($args);
+function atcf_submit_campaign() {
+	return ATCF_Submit_Campaign::instance();
 }
+add_action('init', 'atcf_submit_campaign');
 
 /**
  * Submission fields.
@@ -33,10 +33,11 @@ function atcf_submit_campaign($args = array()) {
  *
  * @since Astoundify Crowdfunding 1.7
  *
+ * @param array $args
  * @return array $fields
  */
 function atcf_shortcode_submit_fields($args = array()) {	
-	return atcf_submit_campaign($args)->get_registered_fields();
+	return atcf_submit_campaign()->get_registered_fields($args);
 }
 
 /**
@@ -62,12 +63,11 @@ class ATCF_Submit_Campaign {
 	 *
 	 * @since Astoundify Crowdfunding 1.7
 	 *
-	 * @param array $args
 	 * @return self
 	 */
-	public static function instance($args = array()) {
+	public static function instance() {
 		if ( ! isset ( self::$instance ) ) {
-			self::$instance = new self($args);
+			self::$instance = new self();
 		}
 
 		return self::$instance;
@@ -80,11 +80,13 @@ class ATCF_Submit_Campaign {
 	 *
 	 * @since Astoundify Crowdfunding 1.7
 	 *
-	 * @param array $args
 	 * @return void
 	 */
-	private function __construct($args = array()) {
-		$this->registered_fields = $this->register_fields($args);		
+	private function __construct() {		
+		// $this->registered_fields = $this->register_fields($args);		
+
+		/** Register the Shortcode */
+		add_shortcode( 'appthemer_crowdfunding_submit', 'atcf_shortcode_submit' );	
 
 		/** Print errors above the shortcode */
 		add_action( 'atcf_shortcode_submit_before', 'edd_print_errors' );
@@ -325,10 +327,15 @@ class ATCF_Submit_Campaign {
 	 * 
 	 * @since Astoundify Crowdfunding 1.7.4
 	 *
+	 * @param array $args
 	 * @return array
 	 */
-	public function get_registered_fields() {
-		return isset($this->registered_fields) ? $this->registered_fields : $this->register_fields();
+	public function get_registered_fields($args = array()) {
+		if ( !isset( $this->registered_fields ) ) {
+			$this->registered_fields = $this->register_fields($args);
+		} 
+		
+		return $this->registered_fields;
 	}
 
 	/**
@@ -791,9 +798,6 @@ function atcf_shortcode_submit( $atts = array() ) {
 
 	return $form;
 }
-
-/** Register the Shortcode */
-add_shortcode( 'appthemer_crowdfunding_submit', 'atcf_shortcode_submit' );
 
 /**
  * Terms of Service
