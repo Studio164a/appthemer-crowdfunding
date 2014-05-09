@@ -465,9 +465,7 @@ class ATCF_Campaign {
 }
 
 function atcf_get_campaign( $campaign ) {
-	$campaign = new ATCF_Campaign( $campaign );
-
-	return $campaign;
+	return apply_filters( 'atcf_get_campaign', new ATCF_Campaign( $campaign ) );
 }
 
 /**
